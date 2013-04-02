@@ -47,7 +47,7 @@ typedef enum
 char print_info = 1;
 char print_kmers = 0;
 char parse_kmers = 1;
-
+char ray_format = 1;
 //
 // File data
 //
@@ -473,6 +473,78 @@ void print_colour_shades(uint8_t *shades, uint8_t *shends)
     putc(get_shade_char(shades, shends, i), stdout);
 }
 
+void print_kmer_in_ray_format(uint64_t* kmer, char * seq,
+                int kmer_size, int num_of_bitfields,
+                uint32_t* covgs, uint8_t* edges, char*kmer_colour_edge_str,
+                uint8_t* shade_data, uint8_t* shend_data
+)
+{
+  int color = 0;
+  unsigned i = 0;
+  char no_edge = '.';
+  char * textual_edges = NULL;
+  unsigned int alphabet_size = 4;
+
+  binary_kmer_to_seq(kmer, seq, kmer_size, num_of_bitfields);
+  printf("%s;", seq);
+
+  // Print coverages
+  printf("%li;", (unsigned long)covgs[color]);
+
+  // Print edges
+  textual_edges = get_edges_str(edges[color], kmer_colour_edge_str);
+
+  for(i = 0; i < alphabet_size; i++)
+  {
+    if(textual_edges[i] == no_edge)
+      continue;
+    printf("%c", toupper(textual_edges[i]));
+  }
+  printf(";");
+
+  i = 0;
+
+  for(i = 0; i < alphabet_size; i++)
+  {
+    if(textual_edges[alphabet_size+i] == no_edge)
+      continue;
+    printf("%c", toupper(textual_edges[alphabet_size+i]));
+  }
+
+  printf("\n");
+}
+
+void print_kmer(uint64_t* kmer, char * seq,
+                int kmer_size, int num_of_bitfields,
+                uint32_t* covgs, uint8_t* edges, char*kmer_colour_edge_str,
+                uint8_t* shade_data, uint8_t* shend_data
+)
+{
+  unsigned int i;
+
+  binary_kmer_to_seq(kmer, seq, kmer_size, num_of_bitfields);
+  printf("%s", seq);
+
+  // Print coverages
+  for(i = 0; i < num_of_colours; i++)
+    printf(" %li", (unsigned long)covgs[i]);
+
+  // Print edges
+  for(i = 0; i < num_of_colours; i++)
+    printf(" %s", get_edges_str(edges[i], kmer_colour_edge_str));
+
+  if(version >= 7 && num_of_shades > 0)
+  {
+    for(i = 0; i < num_of_colours; i++)
+    {
+      putc(' ', stdout);
+      print_colour_shades(shade_data + i*shade_bytes, shend_data + i*shade_bytes);
+    }
+  }
+
+  putc('\n', stdout);
+}
+
 void print_usage()
 {
   fprintf(stderr,
@@ -486,6 +558,8 @@ void print_usage()
 "\n"
 "  --print_kmers   Print each kmer. If used on its own, other information\n"
 "                  (i.e. headers) is not printed out\n"
+"\n"
+"  --ray_format    Use Ray format. This implies --print_kmers\n"
 "\n"
 "  --parse_kmers   Print header info, parse but don't print kmers [default]\n"
 "\n"
@@ -526,6 +600,11 @@ int main(int argc, char** argv)
       }
       else if(strcasecmp(argv[i], "--print_kmers") == 0)
       {
+        print_kmers = 1;
+      }
+      else if(strcasecmp(argv[i], "--ray_format") == 0)
+      {
+        ray_format = 1;
         print_kmers = 1;
       }
       else if(strcasecmp(argv[i], "--parse_kmers") == 0)
@@ -971,27 +1050,12 @@ int main(int argc, char** argv)
     // Print?
     if(print_kmers)
     {
-      binary_kmer_to_seq(kmer, seq, kmer_size, num_of_bitfields);
-      printf("%s", seq);
-
-      // Print coverages
-      for(i = 0; i < num_of_colours; i++)
-        printf(" %li", (unsigned long)covgs[i]);
-
-      // Print edges
-      for(i = 0; i < num_of_colours; i++)
-        printf(" %s", get_edges_str(edges[i], kmer_colour_edge_str));
-
-      if(version >= 7 && num_of_shades > 0)
-      {
-        for(i = 0; i < num_of_colours; i++)
-        {
-          putc(' ', stdout);
-          print_colour_shades(shade_data + i*shade_bytes, shend_data + i*shade_bytes);
-        }
-      }
-
-      putc('\n', stdout);
+      if(ray_format)
+        print_kmer_in_ray_format(kmer, seq, kmer_size, num_of_bitfields, covgs, edges, kmer_colour_edge_str,
+                   shade_data, shend_data);
+      else
+        print_kmer(kmer, seq, kmer_size, num_of_bitfields, covgs, edges, kmer_colour_edge_str,
+                   shade_data, shend_data);
     }
 
     num_of_kmers_read++;
